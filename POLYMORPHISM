@@ -1,1 +1,85 @@
 
+class parent;
+  virtual function void show(); $display("parent.show"); endfunction
+endclass
+
+class child extends parent;
+  function void show(); $display("child.show"); endfunction
+endclass
+
+module tb;
+  parent p;
+  child  c;
+
+  initial begin
+    // Case A: child path
+    c = new();        // child object
+    p = c;            // upcast: p points to child
+    p.show();         // -> "child.show"
+    if ($cast(c, p))  // downcast succeeds (runtime is child)
+      p.show();       // -> still "child.show"
+
+    // Case B: pure parent path
+    p = new();        // parent object
+    if (!$cast(c, p)) // downcast fails (runtime is parent)
+      $display("$cast failed");
+    p.show();         // -> "parent.show"
+  end
+endmodule
+============================================================================p points to c ============================================
+
+class parent;
+  function void show(); $display("parent.show"); endfunction
+endclass
+
+class child extends parent;
+  function void show(); $display("child.show"); endfunction
+endclass
+
+module tb;
+  parent p;
+  child  c;
+
+  initial begin
+    // Case A: child path
+    c = new();        // child object
+    p = c;            // upcast: p points to child
+    p.show();         // -> "child.show"
+    if ($cast(c, p))  // downcast succeeds (runtime is child)
+      p.show();      
+end
+
+yep, that’s fine—you didn’t do p = new(); you did:
+
+c = new(); → one child object allocated
+
+p = c; → p now points to that child object
+
+But your base method isn’t virtual, so the call is statically bound to the handle’s declared type.
+
+p.show() → resolved by the type of p (parent) ⇒ prints parent.show( important)
+
+c.show() → resolved by the type of c (child) ⇒ prints child.show
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+class parent;  virtual function void show(); $display("parent"); endfunction endclass
+class child  extends parent; function void show(); $display("child"); endfunction
+                 function void only_child(); $display("only_child"); endfunction endclass
+
+module tb;
+  parent p;
+  child  c;
+
+  initial begin
+    // Scenario A: You only have a parent handle from somewhere
+    p = new child();            // could also come from a factory/queue
+    if ($cast(c, p)) begin      // downcast check
+      c.only_child();           // safe to call child-specific API
+    end
+
+    // Scenario B: You already had the child handle
+    c = new(); 
+    p = c;                      // upcast; no cast needed
+    // $cast(c, p);             // redundant; c already points to that child
+  end
+endmodule
